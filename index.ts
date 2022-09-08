@@ -3,7 +3,7 @@ require("dotenv").config();
 import * as puppeteer from "puppeteer";
 
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
   await page.goto("http://192.168.1.1/html/home.html");
 
@@ -13,21 +13,88 @@ import * as puppeteer from "puppeteer";
   );
 
   if (connectionType !== "3G") {
+    browser.close();
     return;
   }
 
+  await Promise.all([
+    page.evaluate(
+      (user, pass) => {
+        const settings =
+          document.querySelector<HTMLButtonElement>("#settings")!;
+        settings.click();
+
+        const username = document.querySelector<HTMLInputElement>("#username")!;
+        const password = document.querySelector<HTMLInputElement>("#password")!;
+        username.value = user;
+        password.value = pass;
+
+        const login = document.querySelector<HTMLInputElement>("#pop_login")!;
+        login.click();
+      },
+      process.env.USERNAME!,
+      process.env.PASSWORD!
+    ),
+    page.waitForNavigation(),
+  ]);
+
+  await page.goto("http://192.168.1.1/html/mobilenetworksettings.html");
+
+  await page.waitForSelector("#network_select");
   await page.evaluate(() => {
-    const settings = document.querySelector<HTMLButtonElement>("#settings")!;
-    settings.click();
+    const networkSelect =
+      document.querySelector<HTMLButtonElement>("#network_select")!;
+    networkSelect.value = "1";
 
-    const username = document.querySelector<HTMLInputElement>("#username")!;
-    const password = document.querySelector<HTMLInputElement>("#password")!;
-    username.value = process.env.USERNAME!;
-    password.value = process.env.PASSWORD!;
+    const apply = document.querySelector<HTMLButtonElement>(
+      "#mobilensetting_apply"
+    )!;
+    apply.click();
 
-    const login = document.querySelector<HTMLInputElement>("#pop_login")!;
-    login.click();
+    const ok = document.querySelector<HTMLButtonElement>("#pop_confirm")!;
+    ok.click();
   });
+
+  await page.waitForSelector("#plmn_list", { timeout: 120000 });
+
+  const changed = await page.evaluate((net) => {
+    const networks = [
+      ...document.querySelectorAll<HTMLLabelElement>("#plmn_list tr td label"),
+    ].map((label) => {
+      const separator = label.textContent!.lastIndexOf(" ");
+      const name = label.textContent!.substring(0, separator);
+      const type = label.textContent!.slice(separator + 1);
+      return [name, type, label] as const;
+    });
+
+    let network = networks.find(
+      ([name, network]) => name.includes(net) && network === "4G"
+    );
+
+    if (!network) {
+      network = networks.find(
+        ([name, network]) => name.includes(net) && network === "3G"
+      );
+    }
+
+    if (!network) {
+      return false;
+    }
+
+    network[2].click();
+
+    const ok = document.querySelector<HTMLButtonElement>("#pop_OK")!;
+    ok.click();
+
+    return true;
+  }, process.env.NETWORK!);
+
+  if (changed) {
+    await page.waitForXPath(
+      "//*[@class='info_content' and contains(., 'Success.')]",
+      { timeout: 60000 }
+    );
+  }
 
   await browser.close();
 })();
