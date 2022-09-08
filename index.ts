@@ -13,6 +13,7 @@ import * as puppeteer from "puppeteer";
   );
 
   if (connectionType !== "3G") {
+    console.log("not 3g, exiting");
     browser.close();
     return;
   }
@@ -38,9 +39,14 @@ import * as puppeteer from "puppeteer";
     page.waitForNavigation(),
   ]);
 
-  await page.goto("http://192.168.1.1/html/mobilenetworksettings.html");
+  console.log("go to network settings");
+  await page.goto("http://192.168.1.1/html/mobilenetworksettings.html", {
+    timeout: 60000,
+  });
 
+  console.log("wait for network select");
   await page.waitForSelector("#network_select");
+  console.log("search for networks");
   await page.evaluate(() => {
     const networkSelect =
       document.querySelector<HTMLButtonElement>("#network_select")!;
@@ -55,8 +61,10 @@ import * as puppeteer from "puppeteer";
     ok.click();
   });
 
+  console.log("wait for network list");
   await page.waitForSelector("#plmn_list", { timeout: 120000 });
 
+  console.log("select network");
   const changed = await page.evaluate((net) => {
     const networks = [
       ...document.querySelectorAll<HTMLLabelElement>("#plmn_list tr td label"),
@@ -90,11 +98,13 @@ import * as puppeteer from "puppeteer";
   }, process.env.NETWORK!);
 
   if (changed) {
+    console.log("wait for success");
     await page.waitForXPath(
       "//*[@class='info_content' and contains(., 'Success.')]",
       { timeout: 60000 }
     );
   }
 
+  console.log("done");
   await browser.close();
 })();
