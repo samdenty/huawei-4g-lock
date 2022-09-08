@@ -5,19 +5,23 @@ import * as puppeteer from "puppeteer";
 (async () => {
   const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
+  console.log("navigate to homepage");
   await page.goto("http://192.168.1.1/html/home.html");
 
+  console.log("wait for status");
   await page.waitForSelector("#status_img_rat");
   const connectionType = await page.evaluate(
     () => document.querySelector("#status_img_rat")!.textContent
   );
 
+  console.log("status:", connectionType);
   if (connectionType !== "3G") {
-    console.log("not 3g, exiting");
+    console.log("exiting");
     browser.close();
     return;
   }
 
+  console.log("login");
   await Promise.all([
     page.evaluate(
       (user, pass) => {
