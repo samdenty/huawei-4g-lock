@@ -3,7 +3,7 @@ require("dotenv").config();
 import * as puppeteer from "puppeteer";
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch();
   const page = await browser.newPage();
   console.log("navigate to homepage");
   await page.goto("http://192.168.1.1/html/home.html");
